@@ -1,0 +1,326 @@
+<!DOCTYPE html>
+<html>
+<head>
+
+<meta name="viewport" content="width=device-width,initial-scale=1">
+
+<title>Startup Expense Tracker</title>
+
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+<style>
+
+body{
+font-family:Arial;
+margin:0;
+background:#f4f6f9;
+}
+
+header{
+background:#222;
+color:white;
+padding:15px;
+text-align:center;
+}
+
+.container{
+padding:20px;
+max-width:1000px;
+margin:auto;
+}
+
+.card{
+background:white;
+padding:20px;
+margin:15px 0;
+border-radius:10px;
+box-shadow:0 2px 8px rgba(0,0,0,0.1);
+}
+
+input,select{
+width:100%;
+padding:10px;
+margin:5px 0;
+}
+
+button{
+background:#27ae60;
+color:white;
+padding:10px;
+border:none;
+width:100%;
+}
+
+.stats{
+display:flex;
+gap:10px;
+flex-wrap:wrap;
+}
+
+.stat{
+flex:1;
+background:white;
+padding:15px;
+text-align:center;
+border-radius:10px;
+}
+
+</style>
+
+</head>
+
+<body>
+
+<header>
+<h2>Smart Expense Tracker</h2>
+</header>
+
+<div class="container">
+
+<div class="card">
+
+<h3>Register</h3>
+
+<input id="rname" placeholder="Name">
+<input id="remail" placeholder="Email">
+<input id="rpass" type="password" placeholder="Password">
+<input id="rbudget" placeholder="Monthly Budget">
+
+<button onclick="register()">Register</button>
+
+</div>
+
+<div class="card">
+
+<h3>Login</h3>
+
+<input id="lemail" placeholder="Email">
+<input id="lpass" type="password" placeholder="Password">
+
+<button onclick="login()">Login</button>
+
+</div>
+
+<div id="app" style="display:none">
+
+<div class="stats">
+
+<div class="stat">
+<h4>Total Expense</h4>
+<p id="total">0</p>
+</div>
+
+<div class="stat">
+<h4>Budget</h4>
+<p id="budget">0</p>
+</div>
+
+</div>
+
+<div class="card">
+
+<h3>Add Expense</h3>
+
+<input id="amount" placeholder="Amount">
+
+<select id="category">
+<option>Food</option>
+<option>Travel</option>
+<option>Shopping</option>
+<option>Bills</option>
+</select>
+
+<input id="date" type="date">
+
+<button onclick="addExpense()">Add</button>
+
+<button onclick="voiceAdd()">Voice Add</button>
+
+</div>
+
+<div class="card">
+
+<h3>Expense Chart</h3>
+
+<canvas id="chart"></canvas>
+
+</div>
+
+<div class="card">
+
+<button onclick="exportPDF()">Export PDF</button>
+
+</div>
+
+</div>
+
+</div>
+
+<script>
+
+let userId=null;
+let userBudget=0;
+let expenses=[];
+
+function register(){
+
+fetch("backend.php?action=register",{
+method:"POST",
+body:new URLSearchParams({
+name:rname.value,
+email:remail.value,
+password:rpass.value,
+budget:rbudget.value
+})
+})
+
+.then(res=>res.text())
+.then(alert)
+
+}
+
+function login(){
+
+fetch("backend.php?action=login",{
+method:"POST",
+body:new URLSearchParams({
+email:lemail.value,
+password:lpass.value
+})
+})
+
+.then(res=>res.text())
+.then(data=>{
+
+if(data=="fail"){
+alert("Login Failed")
+}else{
+
+let user=JSON.parse(data)
+
+userId=user.id
+userBudget=user.budget
+
+budget.innerText="₹"+userBudget
+
+app.style.display="block"
+
+loadExpenses()
+
+}
+
+})
+
+}
+
+function addExpense(){
+
+fetch("backend.php?action=addExpense",{
+method:"POST",
+body:new URLSearchParams({
+user:userId,
+amount:amount.value,
+category:category.value,
+date:date.value
+})
+})
+
+.then(()=>loadExpenses())
+
+}
+
+function loadExpenses(){
+
+fetch("backend.php?action=getExpenses&user="+userId)
+
+.then(res=>res.json())
+
+.then(data=>{
+
+expenses=data
+
+updateStats()
+
+updateChart()
+
+})
+
+}
+
+function updateStats(){
+
+let total=0
+
+expenses.forEach(e=>{
+
+total+=parseFloat(e.amount)
+
+})
+
+total.innerText="₹"+total
+
+if(total>userBudget){
+
+alert("Budget exceeded!")
+
+}
+
+}
+
+let chart=new Chart(chart,{
+type:"pie",
+data:{
+labels:["Food","Travel","Shopping","Bills"],
+datasets:[{data:[0,0,0,0]}]
+}
+})
+
+function updateChart(){
+
+let food=0,travel=0,shop=0,bill=0
+
+expenses.forEach(e=>{
+
+if(e.category=="Food")food+=+e.amount
+if(e.category=="Travel")travel+=+e.amount
+if(e.category=="Shopping")shop+=+e.amount
+if(e.category=="Bills")bill+=+e.amount
+
+})
+
+chart.data.datasets[0].data=[food,travel,shop,bill]
+
+chart.update()
+
+}
+
+function exportPDF(){
+
+window.print()
+
+}
+
+function voiceAdd(){
+
+let speech=new webkitSpeechRecognition()
+
+speech.onresult=function(e){
+
+let text=e.results[0][0].transcript
+
+let parts=text.split(" ")
+
+amount.value=parts[1]
+
+category.value=parts[0]
+
+}
+
+speech.start()
+
+}
+
+</script>
+
+</body>
+</html>
